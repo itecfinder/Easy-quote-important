@@ -3,33 +3,44 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+
+import { Building2, Save, Loader2, LogOut, Crown } from 'lucide-react';
+
 import { useApp } from '@/context/app-context';
 import { useSession } from '@/hooks/useSession';
 import { supabase } from '@/lib/supabase-client';
+import { EXIT_URL } from '@/lib/constants';
 
 export function SettingsScreen() {
   const router = useRouter();
 
-  const { contractor, setContractor, memberType } = useApp();
+  const { contractor, setContractor, memberType, planId } = useApp();
   const { email, loading } = useSession();
-
-  const isNewLead = memberType === 'new';
 
   // ---------------- FORM STATE ----------------
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [license, setLicense] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
 
-  // ---------------- SYNC contractor → form ----------------
+  // ---------------- LOAD DATA ----------------
   useEffect(() => {
     if (!contractor) return;
 
@@ -37,33 +48,17 @@ export function SettingsScreen() {
     setPhone(contractor.phone || '');
     setAddress(contractor.address || '');
     setLicense(contractor.license || '');
-    setFirstName(contractor.firstName || '');
-    setLastName(contractor.lastName || '');
   }, [contractor]);
 
-  // ---------------- SYNC session → contractor ----------------
+  // ---------------- SESSION GUARD ----------------
   useEffect(() => {
-    if (!email) return;
+    if (!loading && !email) {
+      router.replace('/login');
+    }
+  }, [email, loading, router]);
 
-    setContractor((prev: any) => ({
-      ...(prev || {}),
-      email,
-    }));
-  }, [email, setContractor]);
-
-  // ---------------- GUARD ----------------
   if (loading) return <p>Loading session...</p>;
-
-  if (!email) {
-    return (
-      <div>
-        <p>Session not found.</p>
-        <button onClick={() => router.push('/login')}>
-          Go to Login
-        </button>
-      </div>
-    );
-  }
+  if (!email) return null;
 
   // ---------------- LOGO UPLOAD ----------------
   async function uploadLogo(file: File) {
@@ -85,8 +80,8 @@ export function SettingsScreen() {
   // ---------------- SAVE ----------------
   async function handleSave() {
     setSaving(true);
-    setError('');
     setSaved(false);
+    setError('');
 
     try {
       let finalLogoUrl = contractor?.logoUrl || '';
@@ -95,48 +90,6 @@ export function SettingsScreen() {
         finalLogoUrl = await uploadLogo(logoFile);
       }
 
-      // ---------------- NEW LEAD ----------------
-      if (isNewLead) {
-        const res = await fetch('/api/auth/create-free-member', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            companyName,
-            phone,
-            address,
-            license,
-            firstName,
-            lastName,
-            logoUrl: finalLogoUrl,
-          }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data?.error || 'Failed to create member');
-        }
-
-        setContractor({
-          email,
-          companyName,
-          phone,
-          address,
-          license,
-          firstName,
-          lastName,
-          logoUrl: finalLogoUrl,
-          membershipPlan: 8,
-        });
-
-        setSaved(true);
-
-        setTimeout(() => router.push('/dashboard'), 1000);
-        return;
-      }
-
-      // ---------------- EXISTING USER UPDATE ----------------
       const { error: updateError } = await supabase
         .from('contractors')
         .update({
@@ -144,8 +97,6 @@ export function SettingsScreen() {
           phone,
           address,
           license,
-          first_name: firstName,
-          last_name: lastName,
           logo_url: finalLogoUrl,
         })
         .eq('email', email);
@@ -158,12 +109,11 @@ export function SettingsScreen() {
         phone,
         address,
         license,
-        firstName,
-        lastName,
         logoUrl: finalLogoUrl,
       }));
 
       setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch (err: any) {
       setError(err.message || 'Save failed');
     } finally {
@@ -171,25 +121,175 @@ export function SettingsScreen() {
     }
   }
 
+  // ---------------- EXIT ----------------
+  function handleExit() {
+    localStorage.clear();
+    fetch('/api/session', { method: 'DELETE' }).finally(() => {
+      window.location.href = EXIT_URL;
+    });
+  }
+
   // ---------------- UI ----------------
   return (
-    <div>
-      <h1>Business Profile</h1>
+    <div className="space-y-6 max-w-2xl mx-auto">
 
-      <input
-        value={companyName}
-        onChange={(e) => setCompanyName(e.target.value)}
-        placeholder="Company Name"
-      />
+      {/* HEADER */}
+      <div>
+        <h1 className="text-2xl font-bold">Settings</h1>
+        <p className="text-muted-foreground">
+          Manage your business profile and membership.
+        </p>
+      </div>
 
-      <input value={email} disabled />
+      {/* PROFILE CARD */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Business Profile
+            </CardTitle>
 
-      <button onClick={handleSave} disabled={saving}>
-        {saving ? 'Saving...' : 'Save'}
-      </button>
+            <Badge variant={memberType === 'paid' ? 'default' : 'secondary'}>
+              {memberType === 'paid' ? (
+                <>
+                  <Crown className="h-3 w-3 mr-1" />
+                  Paid
+                </>
+              ) : (
+                'Free Plan'
+              )}
+            </Badge>
+          </div>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {saved && <p style={{ color: 'green' }}>Saved!</p>}
+          {/* EMAIL UNDER COMPANY TITLE */}
+          <CardDescription>
+            {email} • Plan ID: {planId}
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+
+          {/* COMPANY NAME */}
+          <div className="space-y-2">
+            <Label>Company Name</Label>
+            <Input
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+            />
+          </div>
+
+          {/* EMAIL DISPLAY (READ ONLY, UNDER COMPANY NAME LOGIC) */}
+          <div className="space-y-2">
+            <Label>Email</Label>
+            <Input value={email} disabled />
+          </div>
+
+          {/* PHONE + LICENSE */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>License</Label>
+              <Input
+                value={license}
+                onChange={(e) => setLicense(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* ADDRESS */}
+          <div className="space-y-2">
+            <Label>Address</Label>
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </div>
+
+          {/* LOGO UPLOAD (ONLY) */}
+          <div className="space-y-2">
+            <Label>Upload Logo</Label>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) =>
+                setLogoFile(e.target.files?.[0] || null)
+              }
+            />
+          </div>
+
+          {/* ERROR / SUCCESS */}
+          {error && (
+            <p className="text-sm text-red-500">{error}</p>
+          )}
+
+          {saved && (
+            <p className="text-sm text-green-600">Profile saved</p>
+          )}
+
+          {/* SAVE BUTTON */}
+          <Button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full"
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save Changes
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* UPGRADE */}
+      {memberType !== 'paid' && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-6 flex justify-between items-center">
+            <div>
+              <h3 className="font-semibold flex items-center gap-2">
+                <Crown className="h-4 w-4" />
+                Upgrade to Paid
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Unlimited estimates and features.
+              </p>
+            </div>
+
+            <Button onClick={() => (window.location.href = EXIT_URL)}>
+              Upgrade
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* EXIT */}
+      <Card className="border-destructive/30">
+        <CardContent className="p-6 flex justify-between items-center">
+          <div>
+            <h3 className="font-semibold flex items-center gap-2">
+              <LogOut className="h-4 w-4 text-red-500" />
+              Exit
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Sign out and return to portal.
+            </p>
+          </div>
+
+          <Button variant="destructive" onClick={handleExit}>
+            Exit
+          </Button>
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
