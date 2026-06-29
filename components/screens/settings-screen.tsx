@@ -33,7 +33,7 @@ export function SettingsScreen() {
   const isNewLead = memberType === 'new';
 
   // -----------------------------
-  // Form State
+  // Form state
   // -----------------------------
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
@@ -50,7 +50,7 @@ export function SettingsScreen() {
   const [error, setError] = useState('');
 
   // -----------------------------
-  // Load contractor into form
+  // Load contractor
   // -----------------------------
   useEffect(() => {
     if (!contractor) return;
@@ -62,7 +62,7 @@ export function SettingsScreen() {
   }, [contractor]);
 
   // -----------------------------
-  // Logo handler
+  // Logo upload (preview only)
   // -----------------------------
   function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -73,15 +73,13 @@ export function SettingsScreen() {
   }
 
   async function uploadLogo(file: File): Promise<string> {
-    if (!contractor?.email) throw new Error('Missing contractor email');
+    if (!contractor?.email) throw new Error('Missing email');
 
     const filePath = `logos/${contractor.email}-${Date.now()}`;
 
     const { error } = await supabase.storage
       .from('contractor-logos')
-      .upload(filePath, file, {
-        upsert: true,
-      });
+      .upload(filePath, file, { upsert: true });
 
     if (error) throw error;
 
@@ -93,27 +91,24 @@ export function SettingsScreen() {
   }
 
   // -----------------------------
-  // Save handler
+  // Save
   // -----------------------------
   async function handleSave() {
     setSaving(true);
-    setSaved(false);
     setError('');
+    setSaved(false);
 
     try {
-      if (!contractor?.email) {
-        throw new Error('Missing contractor session');
-      }
+      if (!contractor?.email) throw new Error('Missing session');
 
       let finalLogoUrl = contractor.logoUrl || '';
 
-      // Upload logo if new file selected
       if (logoFile) {
         finalLogoUrl = await uploadLogo(logoFile);
       }
 
       // -----------------------------
-      // NEW LEAD FLOW (BD CREATE)
+      // NEW LEAD → CREATE BD ACCOUNT
       // -----------------------------
       if (isNewLead) {
         const res = await fetch('/api/auth/create-free-member', {
@@ -132,12 +127,8 @@ export function SettingsScreen() {
         });
 
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to create account');
 
-        if (!res.ok) {
-          throw new Error(data.error || 'Failed to create membership');
-        }
-
-        // Update local state
         setContractor({
           email: contractor.email,
           companyName,
@@ -154,7 +145,7 @@ export function SettingsScreen() {
       }
 
       // -----------------------------
-      // EXISTING MEMBER (SUPABASE ONLY)
+      // EXISTING MEMBER → SUPABASE ONLY
       // -----------------------------
       const { error: updateErr } = await supabase
         .from('contractors')
@@ -190,7 +181,7 @@ export function SettingsScreen() {
   }
 
   // -----------------------------
-  // Exit / logout
+  // Exit
   // -----------------------------
   function handleExit() {
     localStorage.removeItem('contractor');
@@ -205,9 +196,9 @@ export function SettingsScreen() {
   // UI
   // -----------------------------
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-6">
 
-      {/* Header */}
+      {/* PAGE TITLE */}
       <div>
         <h1 className="text-2xl font-bold">
           {isNewLead ? 'Set Up Your Business Profile' : 'Settings'}
@@ -215,11 +206,11 @@ export function SettingsScreen() {
         <p className="text-muted-foreground mt-1">
           {isNewLead
             ? 'Complete your profile to activate your free membership.'
-            : 'Manage your business profile.'}
+            : 'Manage your business profile and settings.'}
         </p>
       </div>
 
-      {/* New Lead Banner */}
+      {/* NEW LEAD BANNER */}
       {isNewLead && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 flex gap-3">
@@ -227,77 +218,104 @@ export function SettingsScreen() {
             <div>
               <p className="font-medium text-sm">New Contractor Account</p>
               <p className="text-xs text-muted-foreground">
-                Creating your profile will activate your free membership.
+                Your profile will activate your free membership.
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Profile Card */}
+      {/* =========================
+          MAIN PROFILE CARD
+      ========================= */}
       <Card>
+
+        {/* HEADER (PRO LAYOUT) */}
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-primary" />
-            Business Profile
-          </CardTitle>
+          <div className="flex items-start justify-between gap-4">
 
-          <CardDescription>
-            {isNewLead ? 'Free Plan (1 estimate)' : `Plan ID: ${planId}`} •{' '}
-            {contractor?.email}
-          </CardDescription>
-        </CardHeader>
+            {/* LEFT: LOGO */}
+            <div className="flex flex-col items-center gap-2">
 
-        <CardContent className="space-y-4">
+              <div className="h-14 w-14 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
+                {logoPreview || contractor?.logoUrl ? (
+                  <img
+                    src={logoPreview || contractor?.logoUrl}
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <span className="text-xs text-muted-foreground">Logo</span>
+                )}
+              </div>
 
-          {/* Name + Logo */}
-          <div className="grid sm:grid-cols-3 gap-4">
-            {isNewLead && (
-              <>
-                <div>
-                  <Label>First Name</Label>
-                  <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-                </div>
-
-                <div>
-                  <Label>Last Name</Label>
-                  <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
-                </div>
-              </>
-            )}
-
-            <div>
-              <Label>Logo</Label>
-
-              {logoPreview ? (
-                <img
-                  src={logoPreview}
-                  className="h-24 w-24 border rounded-lg object-contain p-2"
+              <label className="text-xs text-primary cursor-pointer hover:underline">
+                Change
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoUpload}
                 />
-              ) : (
-                <div className="h-24 w-24 border rounded-lg flex items-center justify-center text-xs text-muted-foreground">
-                  No Logo
-                </div>
-              )}
+              </label>
+            </div>
 
-              <Input type="file" accept="image/*" onChange={handleLogoUpload} />
+            {/* RIGHT: INFO */}
+            <div className="text-right space-y-1">
+
+              <CardTitle className="flex items-center justify-end gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                Business Profile
+              </CardTitle>
+
+              <CardDescription>
+                {isNewLead
+                  ? 'Free Plan (1 estimate)'
+                  : `Plan ID: ${planId}`} • {contractor?.email}
+              </CardDescription>
+
+              <div className="flex justify-end">
+                {!isNewLead && memberType === 'paid' ? (
+                  <Badge className="flex items-center gap-1">
+                    <Crown className="h-3 w-3" />
+                    Paid
+                  </Badge>
+                ) : !isNewLead ? (
+                  <Badge variant="secondary">Free</Badge>
+                ) : null}
+              </div>
+
             </div>
           </div>
+        </CardHeader>
 
-          {/* Company */}
+        {/* FORM */}
+        <CardContent className="space-y-4">
+
+          {isNewLead && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>First Name</Label>
+                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+              </div>
+
+              <div>
+                <Label>Last Name</Label>
+                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
+              </div>
+            </div>
+          )}
+
           <div>
             <Label>Company Name</Label>
             <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
           </div>
 
-          {/* Email */}
           <div>
             <Label>Email</Label>
             <Input value={contractor?.email || ''} disabled />
           </div>
 
-          {/* Phone + License */}
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Phone</Label>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
@@ -309,13 +327,12 @@ export function SettingsScreen() {
             </div>
           </div>
 
-          {/* Address */}
           <div>
             <Label>Address</Label>
             <Input value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
 
-          {/* Error */}
+          {/* ERROR */}
           {error && (
             <div className="flex gap-2 text-sm text-red-600 bg-red-50 p-3 rounded">
               <AlertCircle className="h-4 w-4" />
@@ -323,22 +340,27 @@ export function SettingsScreen() {
             </div>
           )}
 
-          {/* Saved */}
+          {/* SAVED */}
           {saved && (
             <p className="text-sm text-green-600">
               {isNewLead ? 'Account created!' : 'Profile saved!'}
             </p>
           )}
 
-          {/* Save */}
+          {/* SAVE BUTTON */}
           <Button onClick={handleSave} disabled={saving} className="w-full">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
             {isNewLead ? 'Create Account' : 'Save Changes'}
           </Button>
+
         </CardContent>
       </Card>
 
-      {/* Upgrade */}
+      {/* UPGRADE */}
       {!isNewLead && memberType !== 'paid' && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="flex justify-between items-center p-5">
@@ -351,6 +373,7 @@ export function SettingsScreen() {
                 Unlimited estimates
               </p>
             </div>
+
             <Button onClick={() => (window.location.href = EXIT_URL)}>
               Upgrade
             </Button>
@@ -358,7 +381,7 @@ export function SettingsScreen() {
         </Card>
       )}
 
-      {/* Exit */}
+      {/* EXIT */}
       {!isNewLead && (
         <Card>
           <CardContent className="flex justify-between items-center p-5">
