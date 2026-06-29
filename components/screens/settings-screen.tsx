@@ -19,8 +19,6 @@ import { Building2, Save, Loader2, LogOut, Crown } from 'lucide-react';
 
 import { useApp } from '@/context/app-context';
 import { useSession } from '@/hooks/useSession';
-import { supabase } from '@/lib/supabase-client';
-import { EXIT_URL } from '@/lib/constants';
 
 export function SettingsScreen() {
   const router = useRouter();
@@ -28,7 +26,7 @@ export function SettingsScreen() {
   const { contractor, setContractor, memberType, planId } = useApp();
   const { session, loading } = useSession();
 
-  const email = session?.user?.email ?? '';
+  const email = session?.email || '';
 
   // ---------------- FORM STATE ----------------
   const [companyName, setCompanyName] = useState('');
