@@ -28,7 +28,6 @@ export function SettingsScreen() {
   const { contractor, setContractor, memberType, planId } = useApp();
   const { session, loading } = useSession();
 
-  // ✅ FIX: session has NO "user"
   const email = session?.email || '';
 
   // ---------------- FORM STATE ----------------
