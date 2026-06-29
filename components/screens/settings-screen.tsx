@@ -19,6 +19,8 @@ import { Building2, Save, Loader2, LogOut, Crown } from 'lucide-react';
 
 import { useApp } from '@/context/app-context';
 import { useSession } from '@/hooks/useSession';
+import { supabase } from '@/lib/supabase-client';
+import { EXIT_URL } from '@/lib/constants';
 
 export function SettingsScreen() {
   const router = useRouter();
@@ -129,7 +131,6 @@ export function SettingsScreen() {
     });
   }
 
-  // ---------------- UI ----------------
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
 
@@ -162,7 +163,6 @@ export function SettingsScreen() {
             </Badge>
           </div>
 
-          {/* EMAIL UNDER COMPANY TITLE */}
           <CardDescription>
             {email} • Plan ID: {planId}
           </CardDescription>
@@ -170,7 +170,6 @@ export function SettingsScreen() {
 
         <CardContent className="space-y-4">
 
-          {/* COMPANY NAME */}
           <div className="space-y-2">
             <Label>Company Name</Label>
             <Input
@@ -179,13 +178,11 @@ export function SettingsScreen() {
             />
           </div>
 
-          {/* EMAIL DISPLAY (READ ONLY, UNDER COMPANY NAME LOGIC) */}
           <div className="space-y-2">
             <Label>Email</Label>
             <Input value={email} disabled />
           </div>
 
-          {/* PHONE + LICENSE */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Phone</Label>
@@ -204,7 +201,6 @@ export function SettingsScreen() {
             </div>
           </div>
 
-          {/* ADDRESS */}
           <div className="space-y-2">
             <Label>Address</Label>
             <Input
@@ -213,7 +209,6 @@ export function SettingsScreen() {
             />
           </div>
 
-          {/* LOGO UPLOAD (ONLY) */}
           <div className="space-y-2">
             <Label>Upload Logo</Label>
             <Input
@@ -225,7 +220,6 @@ export function SettingsScreen() {
             />
           </div>
 
-          {/* ERROR / SUCCESS */}
           {error && (
             <p className="text-sm text-red-500">{error}</p>
           )}
@@ -234,7 +228,6 @@ export function SettingsScreen() {
             <p className="text-sm text-green-600">Profile saved</p>
           )}
 
-          {/* SAVE BUTTON */}
           <Button
             onClick={handleSave}
             disabled={saving}
