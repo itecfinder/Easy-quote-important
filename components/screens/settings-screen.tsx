@@ -145,11 +145,11 @@ export function SettingsScreen() {
       {/* PROFILE CARD */}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Business Profile
-            </CardTitle>
+  <div className="flex justify-between items-center">
+    <CardTitle className="flex items-center gap-2 text-sm font-medium">
+      <Building2 className="h-4 w-4" />
+      Business Profile
+    </CardTitle>
 
             <Badge variant={memberType === 'paid' ? 'default' : 'secondary'}>
               {memberType === 'paid' ? (
