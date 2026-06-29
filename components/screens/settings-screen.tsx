@@ -1,52 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { useApp } from '@/context/app-context';
 import { useSession } from '@/hooks/useSession';
-import { useContractorProfile } from '@/hooks/useContractorProfile';
 
 import { supabase } from '@/lib/supabase-client';
 import { EXIT_URL } from '@/lib/constants';
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-
-import {
-  Building2,
-  Save,
-  Loader2,
-  LogOut,
-  Crown,
-  UserPlus,
-  AlertCircle,
-} from 'lucide-react';
-
 export function SettingsScreen() {
   const router = useRouter();
 
-  // 🔐 SESSION (source of truth)
-  const { email, loading: sessionLoading } = useSession();
+  const { contractor, setContractor, memberType, planId } = useApp();
+  const { email, loading } = useSession();
 
-  // 🧑 PROFILE (DB state)
-  const { profile, setProfile, loading: profileLoading } =
-    useContractorProfile(email);
+  const isNewLead = memberType === 'new';
 
-  const isNewLead = !profile && !profileLoading;
-
-  // -----------------------------
-  // Form state (local UI only)
-  // -----------------------------
+  // ---------------- FORM STATE ----------------
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -55,66 +26,68 @@ export function SettingsScreen() {
   const [lastName, setLastName] = useState('');
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
-  // -----------------------------
-  // Load profile into form once
-  // -----------------------------
-  useState(() => {
-    if (!profile) return;
+  // ---------------- SYNC contractor → form ----------------
+  useEffect(() => {
+    if (!contractor) return;
 
-    setCompanyName(profile.companyName || '');
-    setPhone(profile.phone || '');
-    setAddress(profile.address || '');
-    setLicense(profile.license || '');
-    setFirstName(profile.firstName || '');
-    setLastName(profile.lastName || '');
-  });
+    setCompanyName(contractor.companyName || '');
+    setPhone(contractor.phone || '');
+    setAddress(contractor.address || '');
+    setLicense(contractor.license || '');
+    setFirstName(contractor.firstName || '');
+    setLastName(contractor.lastName || '');
+  }, [contractor]);
 
-  // -----------------------------
-  // GUARD
-  // -----------------------------
-  if (sessionLoading) {
-    return <p className="p-6">Loading session...</p>;
+  // ---------------- IMPORTANT: session → contractor sync ----------------
+  useEffect(() => {
+    if (!email) return;
+
+    setContractor((prev: any) => ({
+      ...prev,
+      email,
+    }));
+  }, [email]);
+
+  // ---------------- GUARD ----------------
+  if (loading) return <p>Loading session...</p>;
+  if (!email) return <p>Missing session</p>;
+
+  // ---------------- LOGO UPLOAD ----------------
+  async function uploadLogo(file: File) {
+    const filePath = `logos/${email}-${Date.now()}`;
+
+    const { error } = await supabase.storage
+      .from('contractor-logos')
+      .upload(filePath, file, { upsert: true });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('contractor-logos')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
   }
 
-  if (!email) {
-    return <p className="p-6 text-red-500">Missing session. Please login.</p>;
-  }
-
-  // -----------------------------
-  // SAVE LOGIC
-  // -----------------------------
+  // ---------------- SAVE ----------------
   async function handleSave() {
     setSaving(true);
     setError('');
-    setSaved(false);
 
     try {
-      let finalLogoUrl = profile?.logoUrl || '';
+      let finalLogoUrl = contractor?.logoUrl || '';
 
       if (logoFile) {
-        const filePath = `logos/${email}-${Date.now()}`;
-
-        const { error } = await supabase.storage
-          .from('contractor-logos')
-          .upload(filePath, logoFile, { upsert: true });
-
-        if (error) throw error;
-
-        const { data } = supabase.storage
-          .from('contractor-logos')
-          .getPublicUrl(filePath);
-
-        finalLogoUrl = data.publicUrl;
+        finalLogoUrl = await uploadLogo(logoFile);
       }
 
-      // NEW LEAD → CREATE BD ACCOUNT
-      if (!profile) {
+      // NEW LEAD → BD CREATE
+      if (isNewLead) {
         const res = await fetch('/api/auth/create-free-member', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -133,7 +106,7 @@ export function SettingsScreen() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        setProfile({
+        setContractor({
           email,
           companyName,
           phone,
@@ -142,6 +115,7 @@ export function SettingsScreen() {
           firstName,
           lastName,
           logoUrl: finalLogoUrl,
+          membershipPlan: 8,
         });
 
         setSaved(true);
@@ -149,7 +123,7 @@ export function SettingsScreen() {
         return;
       }
 
-      // EXISTING → UPDATE SUPABASE
+      // EXISTING → SUPABASE UPDATE
       const { error } = await supabase
         .from('contractors')
         .update({
@@ -165,8 +139,8 @@ export function SettingsScreen() {
 
       if (error) throw error;
 
-      setProfile({
-        ...profile,
+      setContractor({
+        ...contractor,
         companyName,
         phone,
         address,
@@ -184,43 +158,20 @@ export function SettingsScreen() {
     }
   }
 
-  // -----------------------------
-  // UI (simplified)
-  // -----------------------------
+  // ---------------- UI ----------------
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div>
+      <h1>Business Profile</h1>
 
-      <h1 className="text-2xl font-bold">
-        {isNewLead ? 'Set Up Your Business Profile' : 'Settings'}
-      </h1>
+      <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+      <input value={email} disabled />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Business Profile</CardTitle>
-          <CardDescription>{email}</CardDescription>
-        </CardHeader>
+      <button onClick={handleSave} disabled={saving}>
+        Save
+      </button>
 
-        <CardContent className="space-y-4">
-
-          <div>
-            <Label>Company Name</Label>
-            <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
-          </div>
-
-          <div>
-            <Label>Email</Label>
-            <Input value={email} disabled />
-          </div>
-
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save />}
-            Save
-          </Button>
-
-          {error && <p className="text-red-500">{error}</p>}
-          {saved && <p className="text-green-600">Saved!</p>}
-        </CardContent>
-      </Card>
+      {error && <p>{error}</p>}
+      {saved && <p>Saved!</p>}
     </div>
   );
 }
