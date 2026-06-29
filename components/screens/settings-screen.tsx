@@ -5,14 +5,12 @@ import { useRouter } from 'next/navigation';
 
 import { useApp } from '@/context/app-context';
 import { useSession } from '@/hooks/useSession';
-
 import { supabase } from '@/lib/supabase-client';
-import { EXIT_URL } from '@/lib/constants';
 
 export function SettingsScreen() {
   const router = useRouter();
 
-  const { contractor, setContractor, memberType, planId } = useApp();
+  const { contractor, setContractor, memberType } = useApp();
   const { email, loading } = useSession();
 
   const isNewLead = memberType === 'new';
@@ -43,29 +41,39 @@ export function SettingsScreen() {
     setLastName(contractor.lastName || '');
   }, [contractor]);
 
-  // ---------------- IMPORTANT: session → contractor sync ----------------
+  // ---------------- SYNC session → contractor ----------------
   useEffect(() => {
     if (!email) return;
 
     setContractor((prev: any) => ({
-      ...prev,
+      ...(prev || {}),
       email,
     }));
-  }, [email]);
+  }, [email, setContractor]);
 
   // ---------------- GUARD ----------------
   if (loading) return <p>Loading session...</p>;
-  if (!email) return <p>Missing session</p>;
+
+  if (!email) {
+    return (
+      <div>
+        <p>Session not found.</p>
+        <button onClick={() => router.push('/login')}>
+          Go to Login
+        </button>
+      </div>
+    );
+  }
 
   // ---------------- LOGO UPLOAD ----------------
   async function uploadLogo(file: File) {
     const filePath = `logos/${email}-${Date.now()}`;
 
-    const { error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('contractor-logos')
       .upload(filePath, file, { upsert: true });
 
-    if (error) throw error;
+    if (uploadError) throw uploadError;
 
     const { data } = supabase.storage
       .from('contractor-logos')
@@ -78,6 +86,7 @@ export function SettingsScreen() {
   async function handleSave() {
     setSaving(true);
     setError('');
+    setSaved(false);
 
     try {
       let finalLogoUrl = contractor?.logoUrl || '';
@@ -86,7 +95,7 @@ export function SettingsScreen() {
         finalLogoUrl = await uploadLogo(logoFile);
       }
 
-      // NEW LEAD → BD CREATE
+      // ---------------- NEW LEAD ----------------
       if (isNewLead) {
         const res = await fetch('/api/auth/create-free-member', {
           method: 'POST',
@@ -104,7 +113,10 @@ export function SettingsScreen() {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+
+        if (!res.ok) {
+          throw new Error(data?.error || 'Failed to create member');
+        }
 
         setContractor({
           email,
@@ -119,12 +131,13 @@ export function SettingsScreen() {
         });
 
         setSaved(true);
-        setTimeout(() => router.push('/dashboard'), 1200);
+
+        setTimeout(() => router.push('/dashboard'), 1000);
         return;
       }
 
-      // EXISTING → SUPABASE UPDATE
-      const { error } = await supabase
+      // ---------------- EXISTING USER UPDATE ----------------
+      const { error: updateError } = await supabase
         .from('contractors')
         .update({
           company_name: companyName,
@@ -137,10 +150,10 @@ export function SettingsScreen() {
         })
         .eq('email', email);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
-      setContractor({
-        ...contractor,
+      setContractor((prev: any) => ({
+        ...(prev || {}),
         companyName,
         phone,
         address,
@@ -148,7 +161,7 @@ export function SettingsScreen() {
         firstName,
         lastName,
         logoUrl: finalLogoUrl,
-      });
+      }));
 
       setSaved(true);
     } catch (err: any) {
@@ -163,15 +176,20 @@ export function SettingsScreen() {
     <div>
       <h1>Business Profile</h1>
 
-      <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+      <input
+        value={companyName}
+        onChange={(e) => setCompanyName(e.target.value)}
+        placeholder="Company Name"
+      />
+
       <input value={email} disabled />
 
       <button onClick={handleSave} disabled={saving}>
-        Save
+        {saving ? 'Saving...' : 'Save'}
       </button>
 
-      {error && <p>{error}</p>}
-      {saved && <p>Saved!</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {saved && <p style={{ color: 'green' }}>Saved!</p>}
     </div>
   );
 }
