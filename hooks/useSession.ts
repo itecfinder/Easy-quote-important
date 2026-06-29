@@ -1,12 +1,3 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-
-type Session = {
-  email: string | null;
-  loggedIn: boolean;
-};
-
 export const useSession = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,5 +24,10 @@ export const useSession = () => {
     setLoading(false);
   }, []);
 
-  return { session, loading };
+  return {
+    session,
+    email: session?.email ?? null,
+    loggedIn: session?.loggedIn ?? false,
+    loading,
+  };
 };
