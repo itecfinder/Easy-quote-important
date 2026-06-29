@@ -26,7 +26,9 @@ export function SettingsScreen() {
   const router = useRouter();
 
   const { contractor, setContractor, memberType, planId } = useApp();
-  const { email, loading } = useSession();
+  const { session, loading } = useSession();
+
+  const email = session?.user?.email ?? '';
 
   // ---------------- FORM STATE ----------------
   const [companyName, setCompanyName] = useState('');
