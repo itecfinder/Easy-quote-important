@@ -135,12 +135,7 @@ export function SettingsScreen() {
     <div className="space-y-6 max-w-2xl mx-auto">
 
       {/* HEADER */}
-      <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your business profile and membership.
-        </p>
-      </div>
+     
 
       {/* PROFILE CARD */}
       <Card>
