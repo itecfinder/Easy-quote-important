@@ -53,11 +53,6 @@ try {
 } catch (err) {
   console.error('BD lookup failed:', err);
 }
-
-} catch (err) {
-  console.error('BD lookup failed:', err);
-}
-
     let memberType: MemberType;
     let effectivePlan: number;
 
