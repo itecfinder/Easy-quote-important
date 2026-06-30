@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
+import type { SessionPayload } from '@/lib/types';
+
 export const useSession = () => {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<SessionPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +30,7 @@ export const useSession = () => {
   return {
     session,
     email: session?.email ?? null,
-    loggedIn: session?.loggedIn ?? false,
+    loggedIn: !!session,
     loading,
   };
 };
