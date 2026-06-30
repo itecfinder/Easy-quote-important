@@ -11,10 +11,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
     const normalized = email.trim().toLowerCase();
-
     const supabase = getSupabaseServer();
 
-   // 1. BD API lookup — check membership by email.
+  // 1. BD API lookup — check membership by email.
 let planId: number | null = null;
 let bdFound = false;
 
@@ -33,7 +32,7 @@ try {
 
   const data = await res.json();
 
-  console.log('BD response:', data);
+  console.log('BD response:', JSON.stringify(data, null, 2));
 
   if (res.ok) {
     bdFound = true;
@@ -45,12 +44,15 @@ try {
       data?.subscription_id
     );
 
+    console.log('BD parsed planId:', planId);
+
     if (Number.isNaN(planId)) {
       planId = null;
     }
-
-    console.log('BD parsed planId:', planId);
   }
+} catch (err) {
+  console.error('BD lookup failed:', err);
+}
 
 } catch (err) {
   console.error('BD lookup failed:', err);
