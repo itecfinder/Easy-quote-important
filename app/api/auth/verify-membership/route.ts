@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
 import { createSession } from '@/lib/auth';
-import { PAID_PLANS, FREE_PLAN, EXIT_URL, BD_API_BASE } from '@/lib/constants';
+import { PAID_PLANS, FREE_PLAN, EXIT_URL, BD_API_BASE, BD_API_KEY } from '@/lib/constants';
 import type { MemberType } from '@/lib/types';
 
 export async function POST(req: Request) {
@@ -14,23 +14,47 @@ export async function POST(req: Request) {
 
     const supabase = getSupabaseServer();
 
-    // 1. BD API lookup — check membership in external directory.
-    let planId: number | null = null;
-    let bdFound = false;
-    try {
-      const res = await fetch(
-        `${BD_API_BASE}/membership?email=${encodeURIComponent(normalized)}`,
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        bdFound = true;
-        planId = Number(data?.planId ?? data?.plan_id ?? data?.membershipPlan);
-        if (Number.isNaN(planId)) planId = null;
-      }
-    } catch {
-      // BD API unreachable — fall through to Supabase check.
+   // 1. BD API lookup — check membership by email.
+let planId: number | null = null;
+let bdFound = false;
+
+try {
+  const res = await fetch(
+    `${BD_API_BASE}/user/get?property=email&property_value=${encodeURIComponent(normalized)}`,
+    {
+      method: 'GET',
+      headers: {
+        'X-Api-Key': BD_API_KEY,
+      },
     }
+  );
+
+  console.log('BD status:', res.status);
+
+  const data = await res.json();
+
+  console.log('BD response:', data);
+
+  if (res.ok) {
+    bdFound = true;
+
+    planId = Number(
+      data?.planId ??
+      data?.plan_id ??
+      data?.membershipPlan ??
+      data?.subscription_id
+    );
+
+    if (Number.isNaN(planId)) {
+      planId = null;
+    }
+
+    console.log('BD parsed planId:', planId);
+  }
+
+} catch (err) {
+  console.error('BD lookup failed:', err);
+}
 
     let memberType: MemberType;
     let effectivePlan: number;
