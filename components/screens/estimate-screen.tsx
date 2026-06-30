@@ -11,12 +11,12 @@ import { useApp } from '@/context/app-context';
 import { EstimateForm } from '@/components/estimates/estimate-form';
 import { EstimateSummary } from '@/components/estimates/estimate-summary';
 import { calcTotals, newLineItem } from '@/lib/estimate-utils';
-import { supabase } from '@/lib/supabase-client';
+
 import type { LineItem } from '@/lib/types';
 
 export function EstimateScreen() {
   const router = useRouter();
-  const { project, scanResult, estimate, setEstimate, contractor } = useApp();
+  const { project, scanResult, estimate, setEstimate } = useApp();
   const [items, setItems] = useState<LineItem[]>(
     estimate.lineItems.length ? estimate.lineItems : scanResult?.suggestedLineItems || []
   );
@@ -26,9 +26,13 @@ export function EstimateScreen() {
 
   const totals = calcTotals(items, taxRate, markupRate);
 
-  useEffect(() => {
-    setEstimate({ ...estimate, lineItems: items, ...totals });
-  }, [items, taxRate, markupRate]);
+useEffect(() => {
+  setEstimate({
+    ...estimate,
+    lineItems: items,
+    ...totals,
+  });
+}, [items, taxRate, markupRate, estimate, setEstimate, totals]);
 
   function addItem() {
     setItems((prev) => [...prev, newLineItem()]);
@@ -41,39 +45,41 @@ export function EstimateScreen() {
   function removeItem(id: string) {
     setItems((prev) => prev.filter((it) => it.id !== id));
   }
+async function saveProject() {
+  setSaving(true);
 
-  async function saveProject() {
-    if (!contractor?.email) return;
-    setSaving(true);
-    try {
-      const { data: proj } = await supabase
-        .from('projects')
-        .insert({
-          contractor_email: contractor.email,
-          customer_name: project.customerName,
-          customer_email: project.customerEmail,
-          project_type: project.projectType,
-          status: 'estimated',
-          estimate_total: totals.grandTotal,
-          project_data_json: project,
-        })
-        .select('id')
-        .single();
-      if (proj?.id) {
-        await supabase.from('estimates').insert({
-          project_id: proj.id,
-          line_items_json: items,
-          subtotal: totals.subtotal,
-          tax: totals.tax,
-          markup: totals.markup,
-          grand_total: totals.grandTotal,
-        });
-      }
-    } finally {
-      setSaving(false);
-      router.push('/invoice');
+  try {
+    const res = await fetch('/api/estimates/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        project,
+        items,
+        totals,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'Could not create estimate');
+      return;
     }
+
+    router.push('/invoice');
+
+  } catch (err) {
+    alert(
+      err instanceof Error
+        ? err.message
+        : 'Something went wrong'
+    );
+  } finally {
+    setSaving(false);
   }
+}
 
   return (
     <div className="space-y-6 animate-in-fade max-w-3xl mx-auto">
