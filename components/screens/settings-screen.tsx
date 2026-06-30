@@ -105,15 +105,19 @@ export function SettingsScreen() {
 
       if (updateError) throw updateError;
 
-      setContractor({
-  ...(contractor || {}),
+      if (!contractor) {
+  return;
+}
+
+setContractor({
+  ...contractor,
   companyName,
   phone,
   address,
   license,
   logoUrl: finalLogoUrl,
 });
-
+    
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err: any) {
