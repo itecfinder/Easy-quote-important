@@ -17,22 +17,34 @@ export async function POST(req: Request) {
 let planId: number | null = null;
 let bdFound = false;
 
-try {
-  const res = await fetch(
-    `${BD_API_BASE}/user/get?property=email&property_value=${encodeURIComponent(normalized)}`,
-    {
-      method: 'GET',
-      headers: {
-        'X-Api-Key': BD_API_KEY,
-      },
-    }
-  );
+    try {
+  const url = `${BD_API_BASE}/membership?email=${encodeURIComponent(normalized)}`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': BD_API_KEY,
+    },
+  });
 
   console.log('BD status:', res.status);
 
   const data = await res.json();
 
-  console.log('BD response:', JSON.stringify(data, null, 2));
+  console.log('BD is array:', Array.isArray(data));
+
+  console.log(
+    'BD keys:',
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? Object.keys(data)
+      : []
+  );
+
+  console.log(
+    'BD response:',
+    JSON.stringify(data).slice(0, 500)
+  );
 
   if (res.ok) {
     bdFound = true;
@@ -44,15 +56,15 @@ try {
       data?.subscription_id
     );
 
-    console.log('BD parsed planId:', planId);
-
     if (Number.isNaN(planId)) {
       planId = null;
     }
   }
+
 } catch (err) {
   console.error('BD lookup failed:', err);
 }
+
     let memberType: MemberType;
     let effectivePlan: number;
 
