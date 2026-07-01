@@ -29,8 +29,6 @@ export async function POST(req: Request) {
     const firstName = body.firstName || '';
     const lastName = body.lastName || '';
 
-    // 1. Create the membership account in BD via POST /api/v2/user/create.
-    // Required: email, password, subscription_id. Optional: company, phone_number, address1, etc.
     const password = generatePassword();
     const formBody = new URLSearchParams({
       email,
@@ -48,15 +46,18 @@ export async function POST(req: Request) {
 
     let bdCreated = false;
     let bdError = '';
+
     try {
       const res = await fetch(BD_API_USER_CREATE, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          ...(BD_API_KEY ? { Authorization: `Bearer ${BD_API_KEY}` } : {}),
+          'X-Api-Key': BD_API_KEY,
+          'X-BD-Site-URL': process.env.NEXT_PUBLIC_SITE_URL || '',
         },
         body: formBody.toString(),
       });
+
       if (res.ok) {
         bdCreated = true;
       } else {
@@ -74,39 +75,35 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. BD account created — now store the contractor profile in the app.
     const supabase = getSupabaseServer();
-    const { error: upsertErr } = await supabase
-      .from('contractors')
-      .upsert(
-        {
-          email,
-          company_name: companyName,
-          phone,
-          address,
-          license,
-          website,
-          logo_url: logoUrl,
-          membership_plan: FREE_PLAN,
-        },
-        { onConflict: 'email' }
-      );
+
+    const { error: upsertErr } = await supabase.from('contractors').upsert(
+      {
+        email,
+        company_name: companyName,
+        phone,
+        address,
+        license,
+        website,
+        logo_url: logoUrl,
+        membership_plan: FREE_PLAN,
+      },
+      { onConflict: 'email' }
+    );
+
     if (upsertErr) {
       return NextResponse.json({ error: upsertErr.message }, { status: 500 });
     }
 
-    // 3. Initialize the 1 free estimate usage tracker.
-    const { error: usageErr } = await supabase
-      .from('estimate_usage')
-      .upsert(
-        { email, free_estimate_used: false, estimate_count: 0 },
-        { onConflict: 'email' }
-      );
+    const { error: usageErr } = await supabase.from('estimate_usage').upsert(
+      { email, free_estimate_used: false, estimate_count: 0 },
+      { onConflict: 'email' }
+    );
+
     if (usageErr) {
       return NextResponse.json({ error: usageErr.message }, { status: 500 });
     }
 
-    // 4. Upgrade session from 'new' to 'free'.
     await createSession({ email, planId: FREE_PLAN, memberType: 'free' });
 
     return NextResponse.json({
