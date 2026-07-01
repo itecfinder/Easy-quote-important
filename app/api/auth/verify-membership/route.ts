@@ -86,19 +86,18 @@ export async function POST(req: Request) {
         () => controller.abort(),
         5000
       );
-
-
-      const res = await fetch(
-        `${BD_API_BASE}/user/get?property=email&property_value=${encodeURIComponent(normalized)}`,
-        {
-          method: 'GET',
-          headers: {
-            'X-Api-Key': BD_API_KEY,
-          },
-          signal: controller.signal,
-        }
-      );
-
+const res = await fetch(
+  `${BD_API_BASE}/user/get?property=email&property_value=${encodeURIComponent(normalized)}`,
+  {
+    method: 'GET',
+    headers: {
+      'X-Api-Key': BD_API_KEY,
+      'X-BD-Site-URL': 'https://www.itecfinder.com',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    signal: controller.signal,
+  }
+);
 
       clearTimeout(timeout);
 
